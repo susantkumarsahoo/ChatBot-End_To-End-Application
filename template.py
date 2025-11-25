@@ -9,7 +9,7 @@ project_name = "src"  # More descriptive than "src"
 # -------------------------
 # Define additional folders
 # -------------------------
-cicd_folder       = "Github"
+#cicd_folder       = "Github"
 configs_folder    = "configs"
 data_folder       = "data"
 notebooks_folder  = "notebooks"
@@ -161,7 +161,7 @@ list_of_files = [
     f"{project_name}/monitoring/langsmith_logger.py",
 
     # Outside project_name
-    f"{cicd_folder}/pipeline.yml",
+    #f"{cicd_folder}/pipeline.yml",
     f"{configs_folder}/llms_configs.yaml",
     f"{configs_folder}/project_configs.yaml",
     f"{data_folder}/raw/.gitkeep",
@@ -196,7 +196,7 @@ list_of_files = [
     "Dockerfile",
     "docker-compose.yml",
     "pyproject.toml",
-    ".gitignore",
+    #".gitignore",
     "README.md",   
     "main.py",
     "demo.py",
