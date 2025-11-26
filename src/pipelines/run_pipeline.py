@@ -34,8 +34,9 @@ def main():
             print(f"Error: {e}\n")
 
 
-if __name__ == "__main__":
-    main()
+#if __name__ == "__main__":
+#   llms_main = main()
+#   print(llms_main)
 
 
 # python -m src.pipelines.run_pipeline
