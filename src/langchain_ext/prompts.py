@@ -1,15 +1,24 @@
 from langchain_classic.prompts import ChatPromptTemplate, MessagesPlaceholder
-from src.langchain_ext.messages import run_chatbot
 
-def build_chat_prompt(system_message: str) -> ChatPromptTemplate:
+
+def get_chat_prompt(system_message: str) -> ChatPromptTemplate:
     """
-    Build and return a ChatPromptTemplate with system message,
-    history placeholder, and user input.
+    Creates and returns a ChatPromptTemplate with:
+    - system message
+    - history placeholder
+    - user input placeholder
 
     Args:
-        system_message (str): The system message to include.
+        system_message (str): System instructions for the LLM.
 
     Returns:
-        ChatPromptTemplate: Configured prompt template.
+        ChatPromptTemplate: Configured prompt ready for chatbot pipeline.
     """
-    return ChatPromptTemplate.from_messages(run_chatbot)
+
+    prompt_messages = [
+        ("system", system_message),
+        MessagesPlaceholder(variable_name="history"),
+        ("user", "{input}")
+    ]
+
+    return ChatPromptTemplate.from_messages(prompt_messages)
