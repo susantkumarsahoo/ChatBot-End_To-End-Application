@@ -1,4 +1,4 @@
-from langchain_classic.schema import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 
 
 def run_chatbot(user_input: str) -> list:
@@ -23,3 +23,7 @@ def run_chatbot(user_input: str) -> list:
     conversation = [system_msg, human_msg]
 
     return conversation
+
+
+
+# src/langchain_ext/messages.py

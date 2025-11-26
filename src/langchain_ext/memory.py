@@ -1,5 +1,6 @@
 from langchain_classic.memory import ConversationBufferMemory
 
+
 def get_memory():
     """
     Returns a ConversationBufferMemory instance.
@@ -10,3 +11,5 @@ def get_memory():
         return_messages=True
     )
     return memory
+
+# src/langchain_ext/memory.py

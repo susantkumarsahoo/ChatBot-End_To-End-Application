@@ -4,9 +4,10 @@ from langchain_openai import ChatOpenAI
 
 def get_chat_chain(
                 prompt, 
-                memory, model_name: str = "gpt-4o-mini", 
+                memory, 
+                model_name: str = "gpt-4o-mini", 
                 temperature: float = 0.7,
-                max_tokens=500):
+                max_tokens: int = 500):
     """
     Creates and returns a ConversationChain using:
     - ChatPromptTemplate
@@ -18,6 +19,7 @@ def get_chat_chain(
         memory: Memory instance (buffer, window, summary, etc.)
         model_name (str): OpenAI model to use.
         temperature (float): Response creativity level.
+        max_tokens (int): Maximum tokens in response.
 
     Returns:
         ConversationChain: Fully configured chain.
@@ -25,7 +27,8 @@ def get_chat_chain(
 
     llm = ChatOpenAI(
         model=model_name,
-        temperature=temperature
+        temperature=temperature,
+        max_tokens=max_tokens
     )
 
     chain = ConversationChain(

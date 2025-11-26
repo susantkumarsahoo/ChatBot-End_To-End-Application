@@ -1,6 +1,6 @@
-# config.py
 import os
 from dotenv import load_dotenv
+
 
 def get_openai_api_key() -> str:
     """
@@ -12,3 +12,5 @@ def get_openai_api_key() -> str:
     if not api_key:
         raise ValueError("OPENAI_API_KEY not found. Please add it to your .env file.")
     return api_key
+
+#src/langchain_ext/document_loader.py

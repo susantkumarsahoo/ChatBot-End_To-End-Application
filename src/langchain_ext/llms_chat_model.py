@@ -6,15 +6,14 @@ def get_chat_model(
         model: str = "gpt-4o-mini",
         temperature: float = 0.7,
         max_tokens: int = 500):
-
     """
     Returns a ChatOpenAI model instance.
 
     Args:
-        openai_api_key (str): Your OpenAI API key.
-        model_name (str): Model to use (gpt-3.5-turbo, gpt-4, gpt-4o-mini, etc.)
+        api_key (str): Your OpenAI API key.
+        model (str): Model to use (gpt-3.5-turbo, gpt-4, gpt-4o-mini, etc.)
         temperature (float): Creativity level (0.0 to 1.0)
-        max_tokens (int): Optional token limit.
+        max_tokens (int): Token limit.
 
     Returns:
         ChatOpenAI: Configured LLM instance.
@@ -27,3 +26,6 @@ def get_chat_model(
         max_tokens=max_tokens
     )
     return llm
+
+
+# src/langchain_ext/llms_chat_model.py

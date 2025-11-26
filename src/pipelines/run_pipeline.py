@@ -1,10 +1,7 @@
-# pipeline.py
 from src.langchain_ext.document_loader import get_openai_api_key
 from src.langchain_ext.prompts import get_chat_prompt
 from src.langchain_ext.memory import get_memory
-from src.langchain_ext.llms_chat_model import get_chat_model
 from src.langchain_ext.chains import get_chat_chain
-from langchain_classic.chains import ConversationChain
 
 
 def main():
@@ -19,20 +16,9 @@ def main():
     # --- memory ---
     memory = get_memory()
 
-    # --- load LLM model ---
-    llm = get_chat_model(api_key)
-
-    # --- full chain ---
-    chain = get_chat_chain(prompt, memory, llm)
+    # --- full chain (no need to load llm separately, get_chat_chain handles it) ---
+    chatbot = get_chat_chain(prompt, memory)
     
-    chatbot = ConversationChain(
-    llm=llm,
-    memory=memory,
-    prompt=prompt,
-    verbose=True
-)
-
-
     # --- user interaction loop ---
     while True:
         user_input = input("You: ")
@@ -41,11 +27,15 @@ def main():
             print("👋 Goodbye!")
             break
 
-        response = chatbot.invoke({"input": user_input})
-        print("AI:", response["response"])
+        try:
+            response = chatbot.predict(input=user_input)
+            print(f"AI: {response}\n")
+        except Exception as e:
+            print(f"Error: {e}\n")
+
 
 if __name__ == "__main__":
     main()
 
-# python src/pipelines/run_pipeline.py
+
 # python -m src.pipelines.run_pipeline

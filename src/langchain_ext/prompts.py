@@ -1,4 +1,4 @@
-from langchain_classic.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 
 def get_chat_prompt(system_message: str) -> ChatPromptTemplate:
@@ -18,7 +18,10 @@ def get_chat_prompt(system_message: str) -> ChatPromptTemplate:
     prompt_messages = [
         ("system", system_message),
         MessagesPlaceholder(variable_name="history"),
-        ("user", "{input}")
+        ("human", "{input}")
     ]
 
     return ChatPromptTemplate.from_messages(prompt_messages)
+
+
+# src/langchain_ext/prompts.py
