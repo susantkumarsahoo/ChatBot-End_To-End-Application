@@ -1,108 +1,82 @@
-
 import streamlit as st
-from src.pipelines.run_pipeline import main
+from src.pipelines.training_pipeline import initialize_chatbot
 
-# -----------------------------
-# Page Config
-# -----------------------------
-st.set_page_config(
-    page_title="Chatbot UI",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+def main():
+    st.set_page_config(
+        page_title="AI Chatbot",
+        page_icon="🤖",
+        layout="wide"
+    )
 
-# -----------------------------
-# Initialize LLM Pipeline
-# -----------------------------
-# Load the LLM
+    # Sidebar
+    with st.sidebar:
+        st.title("🤖 Chatbot Settings")
+        st.divider()
+        
+        st.subheader("About")
+        st.write("This is an AI-powered chatbot built with LangChain and Streamlit.")
+        
+        st.divider()
+        
+        # Clear chat button
+        #if st.button("🗑️ Clear Chat History", use_container_width=True):
+            #st.session_state.messages = []
+            #st.session_state.llm = initialize_chatbot()
+            #st.rerun()
+        
+        #st.divider()
+        
+        # Display message count
+        #message_count = len(st.session_state.get('messages', []))
+        #st.metric("Total Messages", message_count)
 
-llm = main()
+    # Main content
+    st.title("💬 AI Chatbot")
+    st.caption("Ask me anything!")
 
-# Load the LLM
-
-# -----------------------------
-# Initialize Session State
-# -----------------------------
-if "messages" not in st.session_state:
-    st.session_state["messages"] = []
-
-# -----------------------------
-# Sidebar
-# -----------------------------
-with st.sidebar:
-    st.title("⚙️ Settings")
-    st.markdown("Customize your chatbot here.")
+    # Initialize session state
+    if 'messages' not in st.session_state:
+        st.session_state.messages = []
     
-    if st.button("🆕 New Chat", use_container_width=True):
-        st.session_state["messages"] = []
-        st.rerun()
-    
-    st.divider()
-    
-    # Display message count
-    message_count = len(st.session_state["messages"])
-    st.caption(f"💬 Messages: {message_count}")
-    
-    # Show pipeline status
-    if llm:
-        st.success("✅ LLM Pipeline Loaded")
-    else:
-        st.error("❌ LLM Pipeline Failed")
+    if 'chatbot' not in st.session_state:
+        with st.spinner("Initializing chatbot..."):
+            st.session_state.llms = initialize_chatbot()
 
-# -----------------------------
-# Main Chat Interface
-# -----------------------------
-st.title("💬 Chatbot Application")
-st.markdown("---")
+    # Display chat history
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-# -----------------------------
-# Display Chat History
-# -----------------------------
-chat_container = st.container()
-with chat_container:
-    if len(st.session_state["messages"]) == 0:
-        st.info("👋 Start a conversation by typing a message below!")
-    else:
-        for msg in st.session_state["messages"]:
-            if msg["role"] == "user":
-                with st.chat_message("user", avatar="👤"):
-                    st.markdown(msg["content"])
-            else:
-                with st.chat_message("assistant", avatar="🤖"):
-                    st.markdown(msg["content"])
+    # Chat input
+    if user_input := st.chat_input("Type your message here..."):
+        # Add user message to chat
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        
+        with st.chat_message("user"):
+            st.markdown(user_input)
 
-# -----------------------------
-# User Input Box
-# -----------------------------
-user_input = st.chat_input("Send a message...")
+        # Get AI response
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                try:
+                    response = st.session_state.llms.predict(input=user_input)
+                    st.markdown(response)
+                    
+                    # Add assistant message to chat
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": response
+                    })
+                except Exception as e:
+                    error_msg = f"⚠️ Error: {str(e)}"
+                    st.error(error_msg)
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": error_msg
+                    })
 
-if user_input:
-    # Store user message
-    st.session_state["messages"].append({
-        "role": "user",
-        "content": user_input
-    })
-    
-    # Generate bot reply using LLM pipeline
-    if llm:
-        try:
-            # Call your LLM pipeline with user input
-            bot_reply = llm(user_input)
-            
-            # Convert response to string if needed
-            if not isinstance(bot_reply, str):
-                bot_reply = str(bot_reply)
-                
-        except Exception as e:
-            bot_reply = f"❌ Error: {str(e)}"
-    else:
-        bot_reply = "⚠️ LLM pipeline is not loaded. Please check your configuration."
-    
-    # Store bot message
-    st.session_state["messages"].append({
-        "role": "assistant",
-        "content": bot_reply
-    })
-    
-    # Refresh to display new messages
-    st.rerun()
+if __name__ == "__main__":
+    main()
+
+
+    # streamlit run main.py

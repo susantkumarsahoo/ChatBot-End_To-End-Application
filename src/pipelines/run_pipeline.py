@@ -7,36 +7,33 @@ from src.langchain_ext.chains import get_chat_chain
 def main():
     print("\n🚀 Chatbot Started! Type 'exit' to stop.\n")
 
-    # --- load API key ---
+    # Load API key
     api_key = get_openai_api_key()
 
-    # --- prompt template ---
+    # Prompt template
     prompt = get_chat_prompt("You are a helpful AI assistant.")
 
-    # --- memory ---
+    # Memory instance
     memory = get_memory()
 
-    # --- full chain (no need to load llm separately, get_chat_chain handles it) ---
+    # Full chain (LLM initialized inside)
     chatbot = get_chat_chain(prompt, memory)
-    
-    # --- user interaction loop ---
+
+
     while True:
         user_input = input("You: ")
 
         if user_input.lower() in ["exit", "quit"]:
             print("👋 Goodbye!")
-            break
+        break
 
-        try:
-            response = chatbot.predict(input=user_input)
-            print(f"AI: {response}\n")
-        except Exception as e:
-            print(f"Error: {e}\n")
+    try:
+        response = chatbot.predict(input=user_input)
+        print(f"AI: {response}\n")
+    except Exception as e:
+        print(f"Error: {e}\n")
 
-
-#if __name__ == "__main__":
-#   llms_main = main()
-#   print(llms_main)
-
+if __name__ == "__main__":
+    main()
 
 # python -m src.pipelines.run_pipeline
