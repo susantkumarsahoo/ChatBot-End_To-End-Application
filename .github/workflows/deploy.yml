@@ -40,9 +40,4 @@ jobs:
       - name: Run new container
         run: |
           docker pull 727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
-          docker run -d \
-            --name chatbot \
-            --restart always \
-            -p 8000:8000 \
-            -p 8501:8501 \
-            727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
+          docker run -d --name chatbot --restart always -p 8000:8000 -p 8501:8501 727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
