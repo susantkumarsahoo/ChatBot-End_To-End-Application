@@ -18,12 +18,11 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: us-east-1
 
       - name: Login to Amazon ECR
         run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-          docker login --username AWS --password-stdin ${{ secrets.ECR_REPO_URI }}
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 727646479568.dkr.ecr.us-east-1.amazonaws.com
 
       - name: Build Docker image
         run: |
@@ -31,11 +30,11 @@ jobs:
 
       - name: Tag Docker image
         run: |
-          docker tag chatbot:latest ${{ secrets.ECR_REPO_URI }}:latest
+          docker tag chatbot:latest 727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
 
       - name: Push image to ECR
         run: |
-          docker push ${{ secrets.ECR_REPO_URI }}:latest
+          docker push 727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
 
       - name: Stop old container
         run: |
@@ -44,10 +43,10 @@ jobs:
 
       - name: Run new container
         run: |
-          docker pull ${{ secrets.ECR_REPO_URI }}:latest
+          docker pull 727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
           docker run -d \
             --name chatbot \
             --restart always \
             -p 8000:8000 \
             -p 8501:8501 \
-            ${{ secrets.ECR_REPO_URI }}:latest
+            727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
