@@ -25,36 +25,24 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # ---------------- ECR LOGIN ----------------
-      - name: Login to Amazon ECR
+      # ---------------- LOGIN ----------------
+      - name: Login to ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION \
           | docker login --username AWS --password-stdin $ECR_REPO
 
-      # ---------------- BUILD ----------------
-      - name: Build Docker image
-        run: docker build -t chatbot .
-
-      # ---------------- TAG ----------------
-      - name: Tag Docker image
-        run: docker tag chatbot:latest $ECR_REPO:latest
-
-      # ---------------- PUSH ----------------
-      - name: Push image to ECR
-        run: docker push $ECR_REPO:latest
+      # ---------------- PULL ----------------
+      - name: Pull latest image
+        run: docker pull $ECR_REPO:latest
 
       # ---------------- CLEAN OLD ----------------
-      - name: Stop & Remove old container
+      - name: Remove old container
         run: |
           docker stop chatbot || true
           docker rm chatbot || true
 
-      # ---------------- PULL NEW ----------------
-      - name: Pull latest image
-        run: docker pull $ECR_REPO:latest
-
-      # ---------------- RUN CONTAINER ----------------
-      - name: Run new container
+      # ---------------- RUN ----------------
+      - name: Run container
         run: |
           docker run -d \
             --name chatbot \
@@ -64,9 +52,14 @@ jobs:
             -e AWS_REGION=$AWS_REGION \
             $ECR_REPO:latest
 
-      # ---------------- DEBUG ----------------
-      - name: Debug container if failed
-        if: failure()
+      # ---------------- VERIFY ----------------
+      - name: Verify container
         run: |
+          sleep 5
           docker ps -a
+
+      # ---------------- DEBUG ----------------
+      - name: Logs (always)
+        if: always()
+        run: |
           docker logs chatbot || true
