@@ -7,14 +7,12 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted  # ✅ Your EC2 self-hosted runner
+    runs-on: self-hosted
 
     steps:
-      # Step 1 - Checkout code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2 - Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -22,34 +20,28 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # Step 3 - Login to Amazon ECR
       - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
           docker login --username AWS --password-stdin ${{ secrets.ECR_REPO_URI }}
 
-      # Step 4 - Build Docker image
       - name: Build Docker image
         run: |
           docker build -t chatbot .
 
-      # Step 5 - Tag Docker image
       - name: Tag Docker image
         run: |
           docker tag chatbot:latest ${{ secrets.ECR_REPO_URI }}:latest
 
-      # Step 6 - Push image to ECR
       - name: Push image to ECR
         run: |
           docker push ${{ secrets.ECR_REPO_URI }}:latest
 
-      # Step 7 - Stop and remove old container
       - name: Stop old container
         run: |
           docker stop chatbot || true
           docker rm chatbot || true
 
-      # Step 8 - Pull latest image and run
       - name: Run new container
         run: |
           docker pull ${{ secrets.ECR_REPO_URI }}:latest
