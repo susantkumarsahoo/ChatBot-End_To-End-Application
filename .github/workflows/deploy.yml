@@ -1,3 +1,4 @@
+cat > .github/workflows/deploy.yml << 'EOF'
 name: Deploy Chatbot to EC2
 
 on:
@@ -21,20 +22,16 @@ jobs:
           aws-region: us-east-1
 
       - name: Login to Amazon ECR
-        run: |
-          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 727646479568.dkr.ecr.us-east-1.amazonaws.com
+        run: aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 727646479568.dkr.ecr.us-east-1.amazonaws.com
 
       - name: Build Docker image
-        run: |
-          docker build -t chatbot .
+        run: docker build -t chatbot .
 
       - name: Tag Docker image
-        run: |
-          docker tag chatbot:latest 727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
+        run: docker tag chatbot:latest 727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
 
       - name: Push image to ECR
-        run: |
-          docker push 727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
+        run: docker push 727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
 
       - name: Stop old container
         run: |
@@ -50,3 +47,4 @@ jobs:
             -p 8000:8000 \
             -p 8501:8501 \
             727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
+EOF
