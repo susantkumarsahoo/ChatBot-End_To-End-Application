@@ -9,35 +9,62 @@ jobs:
   deploy:
     runs-on: self-hosted
 
+    env:
+      AWS_REGION: us-east-1
+      ECR_REPO: 727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # ---------------- AWS AUTH ----------------
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: ${{ env.AWS_REGION }}
 
+      # ---------------- ECR LOGIN ----------------
       - name: Login to Amazon ECR
-        run: aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 727646479568.dkr.ecr.us-east-1.amazonaws.com
+        run: |
+          aws ecr get-login-password --region $AWS_REGION \
+          | docker login --username AWS --password-stdin $ECR_REPO
 
+      # ---------------- BUILD ----------------
       - name: Build Docker image
         run: docker build -t chatbot .
 
+      # ---------------- TAG ----------------
       - name: Tag Docker image
-        run: docker tag chatbot:latest 727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
+        run: docker tag chatbot:latest $ECR_REPO:latest
 
+      # ---------------- PUSH ----------------
       - name: Push image to ECR
-        run: docker push 727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
+        run: docker push $ECR_REPO:latest
 
-      - name: Stop old container
+      # ---------------- CLEAN OLD ----------------
+      - name: Stop & Remove old container
         run: |
           docker stop chatbot || true
           docker rm chatbot || true
 
+      # ---------------- PULL NEW ----------------
+      - name: Pull latest image
+        run: docker pull $ECR_REPO:latest
+
+      # ---------------- RUN CONTAINER ----------------
       - name: Run new container
         run: |
-          docker pull 727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
-          docker run -d --name chatbot --restart always -p 8000:8000 -p 8501:8501 727646479568.dkr.ecr.us-east-1.amazonaws.com/chatbot:latest
+          docker run -d \
+            --name chatbot \
+            --restart always \
+            -p 8000:8000 \
+            -p 8501:8501 \
+            -e AWS_REGION=$AWS_REGION \
+            $ECR_REPO:latest
+
+      # ---------------- DEBUG (CRITICAL) ----------------
+      - name: Check container logs if failed
+        if: failure()
+        run: docker logs chatbot
