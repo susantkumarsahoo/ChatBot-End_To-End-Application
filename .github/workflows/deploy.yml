@@ -64,7 +64,9 @@ jobs:
             -e AWS_REGION=$AWS_REGION \
             $ECR_REPO:latest
 
-      # ---------------- DEBUG (CRITICAL) ----------------
-      - name: Check container logs if failed
+      # ---------------- DEBUG ----------------
+      - name: Debug container if failed
         if: failure()
-        run: docker logs chatbot
+        run: |
+          docker ps -a
+          docker logs chatbot || true
