@@ -7,33 +7,55 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted  # ✅ Your EC2 self-hosted runner
 
     steps:
+      # Step 1 - Checkout code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Deploy to EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.0
+      # Step 2 - Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            # Clone repo if not exists, else pull latest
-            if [ ! -d "/home/ubuntu/chatbot" ]; then
-              git clone https://github.com/${{ secrets.GITHUB_USERNAME }}/${{ secrets.REPO_NAME }}.git /home/ubuntu/chatbot
-            fi
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-            cd /home/ubuntu/chatbot
-            git pull origin main
+      # Step 3 - Login to Amazon ECR
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+          docker login --username AWS --password-stdin ${{ secrets.ECR_REPO_URI }}
 
-            # Build and restart Docker container
-            docker build -t chatbot .
-            docker stop chatbot || true
-            docker rm chatbot || true
-            docker run -d \
-              --name chatbot \
-              -p 8000:8000 \
-              -p 8501:8501 \
-              chatbot
+      # Step 4 - Build Docker image
+      - name: Build Docker image
+        run: |
+          docker build -t chatbot .
+
+      # Step 5 - Tag Docker image
+      - name: Tag Docker image
+        run: |
+          docker tag chatbot:latest ${{ secrets.ECR_REPO_URI }}:latest
+
+      # Step 6 - Push image to ECR
+      - name: Push image to ECR
+        run: |
+          docker push ${{ secrets.ECR_REPO_URI }}:latest
+
+      # Step 7 - Stop and remove old container
+      - name: Stop old container
+        run: |
+          docker stop chatbot || true
+          docker rm chatbot || true
+
+      # Step 8 - Pull latest image and run
+      - name: Run new container
+        run: |
+          docker pull ${{ secrets.ECR_REPO_URI }}:latest
+          docker run -d \
+            --name chatbot \
+            --restart always \
+            -p 8000:8000 \
+            -p 8501:8501 \
+            ${{ secrets.ECR_REPO_URI }}:latest
