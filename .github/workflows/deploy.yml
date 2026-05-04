@@ -1,12 +1,14 @@
-name: Deploy Chatbot to EC2
+name: Deploy Application Docker Image to EC2 instance
 
 on:
   push:
     branches: [ "main" ]
 
 jobs:
+
   Continuous-Integration:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -16,7 +18,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}   # ✅ corrected
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -25,7 +27,7 @@ jobs:
       - name: Build, tag, and push image to Amazon ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}   # corrected
           IMAGE_TAG: latest
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
@@ -34,6 +36,7 @@ jobs:
   Continuous-Deployment:
     needs: Continuous-Integration
     runs-on: self-hosted
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,18 +46,28 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}   #  corrected
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Stop old container
+      - name: Stop old container (optional)
         run: |
-          docker stop chatbot || true
-          docker rm chatbot || true
+          docker ps -q --filter "publish=8501" | xargs -r docker stop
+          docker ps -a -q --filter "publish=8501" | xargs -r docker rm
 
       - name: Pull and Run Latest Docker Image
         run: |
-          docker pull ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
-          docker run -d --name chatbot --restart always -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" -e AWS_REGION="${{ secrets.AWS_REGION }}" -p 8000:8000 -p 8501:8501 ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
+          docker pull "${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest"
+          docker run -d \
+            -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            -e AWS_REGION="${{ secrets.AWS_REGION }}" \
+            -p 8501:8501 \
+            "${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest"
+
+
+
+
+
