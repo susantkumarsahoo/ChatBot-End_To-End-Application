@@ -1,30 +1,53 @@
 import subprocess
-import sys
 import time
-import threading
+import signal
+import sys
 
-def run_backend():
-    subprocess.run([sys.executable, "-m", "uvicorn", "backend:app", "--port", "8000", "--reload"])
+processes = []
 
-def run_frontend():
-    time.sleep(2)  # wait for backend to start
-    subprocess.run([sys.executable, "-m", "streamlit", "run", "frontend_app.py", "--server.port", "8501"])
+
+def start_backend():
+    return subprocess.Popen([
+        sys.executable, "-m", "uvicorn",
+        "backend:app",
+        "--host", "0.0.0.0",
+        "--port", "8000"
+    ])
+
+
+def start_frontend():
+    return subprocess.Popen([
+        sys.executable, "-m", "streamlit",
+        "run", "frontend_app.py",
+        "--server.port", "8501",
+        "--server.address", "0.0.0.0"
+    ])
+
+
+def shutdown():
+    print("\n⛔ Shutting down services...")
+    for p in processes:
+        p.terminate()
+    sys.exit(0)
+
 
 if __name__ == "__main__":
-    print("🚀 Starting Backend  → http://localhost:8000")
-    print("🎨 Starting Frontend → http://localhost:8501")
+    print("🚀 Backend  → http://localhost:8000")
+    print("🎨 Frontend → http://localhost:8501")
 
-    t1 = threading.Thread(target=run_backend, daemon=True)
-    t2 = threading.Thread(target=run_frontend, daemon=True)
+    p1 = start_backend()
+    processes.append(p1)
 
-    t1.start()
-    t2.start()
+    time.sleep(3)  # ensure backend starts first
 
-    try:
-        t1.join()
-        t2.join()
-    except KeyboardInterrupt:
-        print("\n⛔ Shutting down both servers...")
+    p2 = start_frontend()
+    processes.append(p2)
+
+    signal.signal(signal.SIGINT, lambda sig, frame: shutdown())
+    signal.signal(signal.SIGTERM, lambda sig, frame: shutdown())
+
+    for p in processes:
+        p.wait()
 
 
 # python run.py

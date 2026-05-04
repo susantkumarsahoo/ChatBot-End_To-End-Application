@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import List, Dict
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage
 from botocore.exceptions import ClientError
@@ -10,7 +11,9 @@ import os
 
 load_dotenv()
 
-
+# -----------------------------
+# AWS Secrets Manager
+# -----------------------------
 def get_secret(secret_name: str, region: str = "us-east-1") -> dict:
     session = boto3.session.Session()
     client = session.client(
@@ -25,15 +28,22 @@ def get_secret(secret_name: str, region: str = "us-east-1") -> dict:
     return json.loads(response["SecretString"])
 
 
-# Load secrets at startup
-secret = get_secret("OpenAI-Keys", "us-east-1")
-OPENAI_API_KEY = secret["OPENAI_API_KEY"]
+# Load API key
+try:
+    secret = get_secret("OpenAI-Keys", "us-east-1")
+    OPENAI_API_KEY = secret["OPENAI_API_KEY"]
+except Exception:
+    # fallback for local dev
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+
+# -----------------------------
+# FastAPI App
+# -----------------------------
 app = FastAPI()
 
-# ✅ Pass API key explicitly
 llm = ChatOpenAI(
-    model="gpt-3.5-turbo",
+    model="gpt-4o-mini",
     temperature=0.7,
     openai_api_key=OPENAI_API_KEY
 )
@@ -41,21 +51,24 @@ llm = ChatOpenAI(
 
 class ChatRequest(BaseModel):
     message: str
-    history: list[dict] = []
+    history: List[Dict] = Field(default_factory=list)
 
 
 @app.post("/chat")
-def chat(req: ChatRequest):
+async def chat(req: ChatRequest):
     try:
         messages = []
+
         for h in req.history:
             if h["role"] == "user":
                 messages.append(HumanMessage(content=h["content"]))
             else:
                 messages.append(AIMessage(content=h["content"]))
+
         messages.append(HumanMessage(content=req.message))
 
-        response = llm.invoke(messages)
+        response = await llm.ainvoke(messages)
+
         return {"reply": response.content}
 
     except Exception as e:
