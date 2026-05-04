@@ -1,3 +1,10 @@
+"""
+run.py — LOCAL development only.
+In Docker, supervisord manages the processes instead.
+
+Usage:
+    python run.py
+"""
 import subprocess
 import time
 import signal
@@ -11,8 +18,9 @@ def start_backend():
     return subprocess.Popen([
         sys.executable, "-m", "uvicorn",
         "backend:app",
-        "--host", "0.0.0.0",
-        "--port", "8000"
+        "--host", "127.0.0.1",
+        "--port", "8000",
+        "--reload",          # auto-reload on code changes locally
     ])
 
 
@@ -21,15 +29,11 @@ def start_frontend():
         sys.executable, "-m", "streamlit",
         "run", "frontend_app.py",
         "--server.port", "8501",
-        "--server.address", "0.0.0.0"
+        "--server.address", "127.0.0.1",
     ])
 
 
 def wait_for_backend(url: str, retries: int = 15, delay: float = 2.0) -> bool:
-    """
-    ✅ Poll the /health endpoint instead of using a fixed sleep.
-    Returns True when the backend is ready, False if it never responds.
-    """
     for attempt in range(1, retries + 1):
         try:
             r = requests.get(url, timeout=3)
@@ -44,18 +48,16 @@ def wait_for_backend(url: str, retries: int = 15, delay: float = 2.0) -> bool:
 
 
 def shutdown(sig=None, frame=None):
-    """✅ Graceful shutdown — terminates both processes cleanly."""
-    print("\n⛔ Shutting down services...")
+    print("\n⛔ Shutting down...")
     for p in processes:
         try:
             p.terminate()
         except Exception:
             pass
-    # Give processes a moment to exit cleanly
     time.sleep(1)
     for p in processes:
         try:
-            p.kill()   # force-kill if still running
+            p.kill()
         except Exception:
             pass
     sys.exit(0)
@@ -63,35 +65,30 @@ def shutdown(sig=None, frame=None):
 
 if __name__ == "__main__":
     print("🚀 Starting backend  → http://localhost:8000")
+    print("   API docs          → http://localhost:8000/docs")
+
     p1 = start_backend()
     processes.append(p1)
 
-    # ✅ Wait until backend /health responds instead of a blind sleep
-    backend_ready = wait_for_backend("http://127.0.0.1:8000/health")
-    if not backend_ready:
-        print("❌ Backend did not start in time. Check logs above.")
+    if not wait_for_backend("http://127.0.0.1:8000/health"):
+        print("❌ Backend failed to start. Check errors above.")
         shutdown()
 
     print("🎨 Starting frontend → http://localhost:8501")
     p2 = start_frontend()
     processes.append(p2)
 
-    # ✅ Register signal handlers AFTER both processes are started
-    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGINT,  shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
-    print("\n✅ Both services are running.")
-    print("   Backend  → http://localhost:8000")
-    print("   Frontend → http://localhost:8501")
+    print("\n✅ Both services running.")
+    print("   Open in browser → http://localhost:8501")
     print("   Press Ctrl+C to stop.\n")
 
-    # Block until either process exits unexpectedly
     for p in processes:
         p.wait()
 
-    print("⚠️  A service exited unexpectedly. Shutting down.")
+    print("⚠️  A service exited unexpectedly.")
     shutdown()
-
-
 
 # python run.py

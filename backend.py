@@ -10,7 +10,7 @@ import boto3
 import json
 import os
 
-load_dotenv()
+load_dotenv()  # works locally; no-op in Docker (no .env file present)
 
 # -----------------------------
 # AWS Secrets Manager
@@ -25,36 +25,40 @@ def get_secret(secret_name: str, region: str = "us-east-1") -> dict:
         response = client.get_secret_value(SecretId=secret_name)
     except ClientError as e:
         raise RuntimeError(f"Failed to retrieve secret: {e}")
-
     return json.loads(response["SecretString"])
 
 
-# Load API key (AWS first, then .env fallback)
+# Load API key — tries AWS Secrets Manager first, then falls back to env var
 OPENAI_API_KEY = None
+
 try:
     secret = get_secret("OpenAI-Keys", "us-east-1")
     OPENAI_API_KEY = secret.get("OPENAI_API_KEY")
-except Exception:
-    pass
+    print("✅ Loaded API key from AWS Secrets Manager")
+except Exception as e:
+    print(f"⚠️  Secrets Manager unavailable ({e}), falling back to env var")
 
 if not OPENAI_API_KEY:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    if OPENAI_API_KEY:
+        print("✅ Loaded API key from environment variable")
 
 if not OPENAI_API_KEY:
     raise RuntimeError(
-        "OPENAI_API_KEY not found in AWS Secrets Manager or environment variables."
+        "OPENAI_API_KEY not found.\n"
+        "  • Locally: add it to your .env file\n"
+        "  • On EC2:  pass -e OPENAI_API_KEY=sk-... to docker run, "
+        "or attach an IAM role with Secrets Manager access"
     )
-
 
 # -----------------------------
 # FastAPI App
 # -----------------------------
 app = FastAPI(title="AI Chatbot API", version="1.0.0")
 
-# ✅ CORS — required so the Streamlit frontend (different port/domain) can call this API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        # Tighten this in production, e.g. ["https://your-frontend.com"]
+    allow_origins=["*"],   # tighten in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -70,13 +74,9 @@ llm = ChatOpenAI(
 class ChatRequest(BaseModel):
     message: str
     history: List[Dict] = Field(default_factory=list)
-    system_prompt: str = Field(
-        default="You are a helpful AI assistant.",
-        description="Optional system prompt to customize assistant behavior."
-    )
+    system_prompt: str = Field(default="You are a helpful AI assistant.")
 
 
-# ✅ Health check endpoint — required by cloud platforms (ECS, App Runner, Railway, etc.)
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
@@ -92,13 +92,11 @@ async def chat(req: ChatRequest):
     try:
         messages = []
 
-        # Include system prompt if provided
         if req.system_prompt:
             messages.append(SystemMessage(content=req.system_prompt))
 
-        # Rebuild conversation history
         for h in req.history:
-            role = h.get("role", "")
+            role    = h.get("role", "")
             content = h.get("content", "")
             if not content:
                 continue
@@ -107,22 +105,19 @@ async def chat(req: ChatRequest):
             elif role == "assistant":
                 messages.append(AIMessage(content=content))
 
-        # Append latest user message
         messages.append(HumanMessage(content=req.message))
 
         response = await llm.ainvoke(messages)
-
         return {"reply": response.content}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ✅ Entry point for direct execution: python backend.py
+# Entry point for local run: python backend.py
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run("backend:app", host="0.0.0.0", port=port, reload=False)
-
 
 # python backend.py
