@@ -1,6 +1,58 @@
+# ─────────────────────────────────────────
+# Secrets & local config  (never bake into image)
+# ─────────────────────────────────────────
 .env
+*.pem
+*.key
+*.crt
+
+# ─────────────────────────────────────────
+# Version control
+# ─────────────────────────────────────────
+.git
+.gitignore
+.github
+
+# ─────────────────────────────────────────
+# Python cache & build artefacts
+# ─────────────────────────────────────────
 __pycache__
 *.pyc
-*.pem
+*.pyo
+*.pyd
+*.egg-info
+dist/
+build/
+.eggs/
+
+# ─────────────────────────────────────────
+# Virtual environments
+# ─────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ─────────────────────────────────────────
+# IDE & OS files
+# ─────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ─────────────────────────────────────────
+# Docs & tests  (not needed at runtime)
+# ─────────────────────────────────────────
 *.md
-.dockerignore
+tests/
+test_*.py
+*_test.py
+
+# ─────────────────────────────────────────
+# CI/CD  (not needed inside the image)
+# ─────────────────────────────────────────
+.github/
+
+
+# Dockerignore

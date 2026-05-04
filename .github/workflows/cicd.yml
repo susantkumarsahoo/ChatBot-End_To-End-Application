@@ -4,8 +4,16 @@ on:
   push:
     branches: ["main"]
 
+# ✅ Shared image tag so both jobs use the exact same tag (git SHA → reproducible)
+env:
+  IMAGE_TAG: ${{ github.sha }}
+
 jobs:
 
+  # ─────────────────────────────────────────────────────────────────
+  # CI  — builds the image and pushes it to ECR
+  # Runs on GitHub-hosted runner (no AWS instance role needed here)
+  # ─────────────────────────────────────────────────────────────────
   Continuous-Integration:
     runs-on: ubuntu-latest
 
@@ -28,12 +36,21 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-          IMAGE_TAG: latest
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          # ✅ Tag with git SHA (unique) AND also move the 'latest' pointer
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+                       -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-
+  # ─────────────────────────────────────────────────────────────────
+  # CD  — pulls the new image onto the EC2 runner and restarts the container
+  # The self-hosted runner should have an IAM instance role attached
+  # with ecr:GetAuthorizationToken + ecr:BatchGetImage permissions.
+  # If your EC2 does NOT have an instance role, uncomment the
+  # aws-access-key-id / aws-secret-access-key lines below.
+  # ─────────────────────────────────────────────────────────────────
   Continuous-Deployment:
     needs: Continuous-Integration
     runs-on: self-hosted   # EC2 runner
@@ -45,38 +62,77 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
+          # ✅ FIXED: CD job also needs credentials.
+          #    If your EC2 has an IAM instance role → these two lines are optional
+          #    but including them makes the workflow work with OR without a role.
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # -----------------------------
-      # Stop & Remove old container
-      # -----------------------------
+      # ─────────────────────────────────────────
+      # Pull the exact image built in the CI job
+      # ─────────────────────────────────────────
+      - name: Pull latest image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+        run: |
+          docker pull "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      # ─────────────────────────────────────────
+      # Stop & remove the old container safely
+      # ─────────────────────────────────────────
       - name: Stop old container
         run: |
-          docker stop chatbot || true
-          docker rm chatbot || true
+          docker stop chatbot 2>/dev/null || true
+          docker rm   chatbot 2>/dev/null || true
 
-      # -----------------------------
-      # Pull latest image
-      # -----------------------------
-      - name: Pull latest image
-        run: |
-          docker pull "${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest"
-
-      # -----------------------------
-      # Run container (FIXED)
-      # -----------------------------
+      # ─────────────────────────────────────────
+      # Start the new container
+      # ─────────────────────────────────────────
       - name: Run new container
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
         run: |
           docker run -d \
             --name chatbot \
+            --restart always \
             -p 8000:8000 \
             -p 8501:8501 \
             -e API_URL="http://localhost:8000/chat" \
-            "${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest"
+            -e AWS_DEFAULT_REGION="${{ secrets.AWS_REGION }}" \
+            "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      # ─────────────────────────────────────────
+      # Wait for the container's health check to pass
+      # ─────────────────────────────────────────
+      - name: Wait for container to be healthy
+        run: |
+          echo "Waiting for backend health check..."
+          for i in $(seq 1 15); do
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' chatbot 2>/dev/null || echo "unknown")
+            echo "  Attempt $i/15 — status: $STATUS"
+            if [ "$STATUS" = "healthy" ]; then
+              echo "✅ Container is healthy."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "❌ Container did not become healthy in time."
+          docker logs chatbot
+          exit 1
+
+      # ─────────────────────────────────────────
+      # ✅ Prune dangling images to free disk space
+      # ─────────────────────────────────────────
+      - name: Clean up old Docker images
+        run: |
+          docker image prune -f
 
 
 
