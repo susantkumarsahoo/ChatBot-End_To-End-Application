@@ -20,7 +20,7 @@ def start_backend() -> subprocess.Popen:
     return subprocess.Popen([
         sys.executable, "-m", "uvicorn",
         "backend:app",
-        "--host", "127.0.0.1",
+        "--host", "0.0.0.0",
         "--port", "8000",
         "--reload",          # auto-reload on code changes locally
     ])
@@ -31,7 +31,7 @@ def start_frontend() -> subprocess.Popen:
         sys.executable, "-m", "streamlit",
         "run", "frontend_app.py",
         "--server.port", "8501",
-        "--server.address", "127.0.0.1",
+        "--server.address", "0.0.0.0",
     ])
 
 
