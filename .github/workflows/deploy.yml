@@ -4,20 +4,12 @@ on:
   push:
     branches: ["main"]
 
-# Prevent concurrent deployments — if a new push arrives while a deploy is
-# running, cancel the in-progress run and start fresh.
 concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  IMAGE_TAG: ${{ github.sha }}
-
 jobs:
 
-  # ─────────────────────────────────────────────────────────────────
-  # CI — build and push to ECR (runs on GitHub-hosted runner)
-  # ─────────────────────────────────────────────────────────────────
   Continuous-Integration:
     runs-on: ubuntu-latest
 
@@ -41,20 +33,9 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
         run: |
-          docker build \
-            -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
-            -t "$ECR_REGISTRY/$ECR_REPOSITORY:latest" .
-
-          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:latest" .
           docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
-  # ─────────────────────────────────────────────────────────────────
-  # CD — pull the new image onto EC2 and restart the container
-  # The self-hosted runner must have the GitHub Actions runner service
-  # installed on the EC2 instance. An IAM instance role with
-  # ecr:GetAuthorizationToken + ecr:BatchGetImage is recommended;
-  # the explicit key/secret below also work without a role.
-  # ─────────────────────────────────────────────────────────────────
   Continuous-Deployment:
     needs: Continuous-Integration
     runs-on: self-hosted
@@ -74,19 +55,19 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Pull exact image built in CI
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-        run: |
-          docker pull "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-
       - name: Stop and remove old container
         run: |
           docker stop chatbot 2>/dev/null || true
           docker rm   chatbot 2>/dev/null || true
 
-      - name: Start new container
+      - name: Pull latest image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+        run: |
+          docker pull "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+
+      - name: Run new container
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
@@ -96,17 +77,15 @@ jobs:
             --restart always \
             -p 8000:8000 \
             -p 8501:8501 \
-            -e API_URL="http://localhost:8000/chat" \
+            -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
             -e AWS_DEFAULT_REGION="${{ secrets.AWS_REGION }}" \
-            "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+            -e API_URL="http://localhost:8000/chat" \
+            "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
-      # Wait for the container's HEALTHCHECK to pass.
-      # Falls back gracefully if the container has no HEALTHCHECK defined
-      # (status will be "" or "none") by also accepting a running container
-      # after the start-period.
       - name: Wait for container to be healthy
         run: |
-          echo "Waiting for container health check..."
+          echo "Waiting for backend to be ready..."
           for i in $(seq 1 20); do
             STATUS=$(docker inspect --format='{{.State.Health.Status}}' chatbot 2>/dev/null || echo "unknown")
             STATE=$(docker inspect  --format='{{.State.Status}}'        chatbot 2>/dev/null || echo "unknown")
@@ -117,18 +96,8 @@ jobs:
               exit 0
             fi
 
-            # If the image has no HEALTHCHECK the status is "" (empty string).
-            # In that case, just confirm the container is still running after
-            # a 30-second grace period.
-            if [ -z "$STATUS" ] || [ "$STATUS" = "none" ]; then
-              if [ "$STATE" = "running" ] && [ "$i" -ge 7 ]; then
-                echo "No HEALTHCHECK defined; container is running — treating as healthy."
-                exit 0
-              fi
-            fi
-
             if [ "$STATE" = "exited" ] || [ "$STATUS" = "unhealthy" ]; then
-              echo "Container failed to start."
+              echo "Container failed to start. Logs:"
               docker logs chatbot
               exit 1
             fi
@@ -136,27 +105,13 @@ jobs:
             sleep 5
           done
 
-          echo "Container did not become healthy in time."
+          echo "Timed out waiting. Logs:"
           docker logs chatbot
           exit 1
 
-      # Remove dangling images AND old SHA-tagged images for this repo
-      # to prevent disk exhaustion over many deployments.
       - name: Clean up old Docker images
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
         run: |
           docker image prune -f
-
-          # Remove all local tags for this repo except the one just deployed
-          docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' \
-            | grep "^$ECR_REGISTRY/$ECR_REPOSITORY:" \
-            | grep -v ":$IMAGE_TAG " \
-            | grep -v ":latest " \
-            | awk '{print $1}' \
-            | xargs -r docker rmi --force 2>/dev/null || true
-
 
 
 
