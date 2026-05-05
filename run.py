@@ -1,10 +1,12 @@
 """
-run.py — LOCAL development only.
-In Docker, supervisord manages the processes instead.
+Local development launcher.
+Starts the FastAPI backend and Streamlit frontend in two subprocesses,
+waits for the backend to be ready, then keeps both alive until Ctrl-C.
 
 Usage:
     python run.py
 """
+
 import subprocess
 import time
 import signal
@@ -14,7 +16,7 @@ import requests
 processes = []
 
 
-def start_backend():
+def start_backend() -> subprocess.Popen:
     return subprocess.Popen([
         sys.executable, "-m", "uvicorn",
         "backend:app",
@@ -24,7 +26,7 @@ def start_backend():
     ])
 
 
-def start_frontend():
+def start_frontend() -> subprocess.Popen:
     return subprocess.Popen([
         sys.executable, "-m", "streamlit",
         "run", "frontend_app.py",
@@ -38,7 +40,7 @@ def wait_for_backend(url: str, retries: int = 15, delay: float = 2.0) -> bool:
         try:
             r = requests.get(url, timeout=3)
             if r.status_code == 200:
-                print(f"✅ Backend ready after {attempt} attempt(s).")
+                print(f"Backend ready after {attempt} attempt(s).")
                 return True
         except requests.exceptions.RequestException:
             pass
@@ -47,8 +49,8 @@ def wait_for_backend(url: str, retries: int = 15, delay: float = 2.0) -> bool:
     return False
 
 
-def shutdown(sig=None, frame=None):
-    print("\n⛔ Shutting down...")
+def shutdown(sig=None, frame=None) -> None:
+    print("\nShutting down...")
     for p in processes:
         try:
             p.terminate()
@@ -64,31 +66,34 @@ def shutdown(sig=None, frame=None):
 
 
 if __name__ == "__main__":
-    print("🚀 Starting backend  → http://localhost:8000")
-    print("   API docs          → http://localhost:8000/docs")
+    print("Starting backend  → http://localhost:8000")
+    print("   API docs       → http://localhost:8000/docs")
 
     p1 = start_backend()
     processes.append(p1)
 
     if not wait_for_backend("http://127.0.0.1:8000/health"):
-        print("❌ Backend failed to start. Check errors above.")
+        print("Backend failed to start. Check errors above.")
         shutdown()
 
-    print("🎨 Starting frontend → http://localhost:8501")
+    print("Starting frontend → http://localhost:8501")
     p2 = start_frontend()
     processes.append(p2)
 
     signal.signal(signal.SIGINT,  shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
-    print("\n✅ Both services running.")
+    print("\nBoth services running.")
     print("   Open in browser → http://localhost:8501")
     print("   Press Ctrl+C to stop.\n")
 
     for p in processes:
         p.wait()
 
-    print("⚠️  A service exited unexpectedly.")
+    print("A service exited unexpectedly.")
     shutdown()
+
+
+
 
 # python run.py
