@@ -9,10 +9,11 @@ import os
 # e.g. http://<EC2-public-ip>:8000/chat
 # When running in the same container, the default below is correct.
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/chat")
-
+powered_by = "Powered by Susant"
+ 
 st.set_page_config(page_title="AI Chatbot", page_icon="🤖", layout="wide")
 st.title("🤖 AI Chatbot")
-st.caption(f"Connected to: `{API_URL}`")
+st.caption(f"Connected to: `{powered_by}`")
 
 # Session state initialisation
 if "history" not in st.session_state:
