@@ -17,6 +17,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-test.txt
+
+      - name: Run tests
+        run: pytest test_app.py -v
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -86,8 +97,6 @@ jobs:
       - name: Wait for container to be healthy
         run: |
           echo "Waiting for backend to be ready..."
-          # Allow extra time for Docker's start-period (40s) to elapse first
-          echo "Sleeping 45s for container start-period..."
           sleep 45
 
           for i in $(seq 1 24); do

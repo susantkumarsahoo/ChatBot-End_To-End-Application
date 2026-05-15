@@ -5,32 +5,22 @@ import os
 # ─────────────────────────────────────────
 # API URL configuration
 # ─────────────────────────────────────────
-# In production set API_URL env var to your deployed backend URL.
-# e.g. http://<EC2-public-ip>:8000/chat
-# When running in the same container, the default below is correct.
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/chat")
+SYSTEM_PROMPT = "You are a helpful AI assistant."
 powered_by = "Susant"
- 
+
 st.set_page_config(page_title="AI Chatbot", page_icon="🤖", layout="wide")
 st.title("🤖 AI Chatbot")
 st.caption(f"Deployed by: `{powered_by}`")
 
+# Clear chat button in main area
+if st.button("🗑️ Clear Chat"):
+    st.session_state.history = []
+    st.rerun()
+
 # Session state initialisation
 if "history" not in st.session_state:
     st.session_state.history = []
-
-# Sidebar: optional system prompt
-with st.sidebar:
-    st.header("⚙️ Settings")
-    system_prompt = st.text_area(
-        "System Prompt",
-        value="You are a helpful AI assistant.",
-        height=120,
-        help="Customise how the assistant behaves.",
-    )
-    if st.button("🗑️ Clear Chat"):
-        st.session_state.history = []
-        st.rerun()
 
 # Display existing chat history
 for msg in st.session_state.history:
@@ -52,9 +42,8 @@ if user_input:
                     API_URL,
                     json={
                         "message": user_input,
-                        # Send history excluding the message just appended above
                         "history": st.session_state.history[:-1],
-                        "system_prompt": system_prompt,
+                        "system_prompt": SYSTEM_PROMPT,
                     },
                     timeout=60,
                 )
@@ -82,7 +71,6 @@ if user_input:
         st.write(reply)
 
     st.session_state.history.append({"role": "assistant", "content": reply})
-
 
 
 
